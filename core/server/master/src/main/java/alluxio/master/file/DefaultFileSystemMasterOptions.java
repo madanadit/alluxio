@@ -11,6 +11,7 @@
 
 package alluxio.master.file;
 
+import alluxio.grpc.GetStatusPOptions;
 import alluxio.master.file.options.CheckConsistencyOptions;
 import alluxio.master.file.options.CommonOptions;
 import alluxio.master.file.options.CompleteFileOptions;
@@ -18,7 +19,6 @@ import alluxio.master.file.options.CreateDirectoryOptions;
 import alluxio.master.file.options.CreateFileOptions;
 import alluxio.master.file.options.DeleteOptions;
 import alluxio.master.file.options.FreeOptions;
-import alluxio.master.file.options.GetStatusOptions;
 import alluxio.master.file.options.ListStatusOptions;
 import alluxio.master.file.options.LoadMetadataOptions;
 import alluxio.master.file.options.MountOptions;
@@ -68,8 +68,8 @@ public final class DefaultFileSystemMasterOptions implements FileSystemMasterOpt
   }
 
   @Override
-  public GetStatusOptions getGetStatusOptions() {
-    return GetStatusOptions.defaults();
+  public GetStatusPOptions.Builder getGetStatusPOptions() {
+    return GetStatusPOptions.newBuilder();
   }
 
   @Override

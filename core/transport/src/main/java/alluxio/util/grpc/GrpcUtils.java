@@ -229,24 +229,24 @@ public final class GrpcUtils {
   }
 
   /**
-   * Converts from proto type to options.
+   * Merge master options with the given option
    *
    * @param masterOptions the default master options provider
    * @param pOptions the proto options to convert
-   * @return the converted options instance
+   * @return the merged options instance
    */
-  public static GetStatusOptions fromProto(FileSystemMasterOptions masterOptions,
-      GetStatusPOptions pOptions) {
-    GetStatusOptions options = masterOptions.getGetStatusOptions();
+  public static GetStatusPOptions fromProto(FileSystemMasterOptions masterOptions,
+                                           GetStatusPOptions pOptions) {
+    GetStatusPOptions.Builder optionsBuilder = masterOptions.getGetStatusPOptions().toBuilder();
     if (pOptions != null) {
       if (pOptions.hasCommonOptions()) {
-        options.setCommonOptions(fromProto(masterOptions, pOptions.getCommonOptions()));
+        optionsBuilder.setCommonOptions(pOptions.getCommonOptions());
       }
       if (pOptions.hasLoadMetadataType()) {
-        options.setLoadMetadataType(fromProto(pOptions.getLoadMetadataType()));
+        optionsBuilder.setLoadMetadataType(pOptions.getLoadMetadataType());
       }
     }
-    return options;
+    return optionsBuilder.build();
   }
 
   /**
