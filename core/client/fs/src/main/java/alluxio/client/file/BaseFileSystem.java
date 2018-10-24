@@ -21,7 +21,6 @@ import alluxio.client.file.options.CreateFileOptions;
 import alluxio.client.file.options.DeleteOptions;
 import alluxio.client.file.options.ExistsOptions;
 import alluxio.client.file.options.FreeOptions;
-import alluxio.client.file.options.GetStatusOptions;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.client.file.options.ListStatusOptions;
 import alluxio.client.file.options.LoadMetadataOptions;
@@ -32,6 +31,7 @@ import alluxio.client.file.options.RenameOptions;
 import alluxio.client.file.options.SetAclOptions;
 import alluxio.client.file.options.SetAttributeOptions;
 import alluxio.client.file.options.UnmountOptions;
+import alluxio.client.fs.FileSystemClientOptions;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.DirectoryNotEmptyException;
 import alluxio.exception.ExceptionMessage;
@@ -44,10 +44,11 @@ import alluxio.exception.status.FailedPreconditionException;
 import alluxio.exception.status.InvalidArgumentException;
 import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
+import alluxio.grpc.GetStatusPOptions;
+import alluxio.grpc.LoadMetadataPType;
 import alluxio.security.authorization.AclEntry;
 import alluxio.uri.Authority;
 import alluxio.uri.SingleMasterAuthority;
-import alluxio.wire.LoadMetadataType;
 import alluxio.wire.MountPointInfo;
 import alluxio.wire.SetAclAction;
 
@@ -131,10 +132,14 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.createFile(path, options);
       // Do not sync before this getStatus, since the UFS file is expected to not exist.
-      GetStatusOptions opts = GetStatusOptions.defaults();
-      opts.setLoadMetadataType(LoadMetadataType.Never);
-      opts.getCommonOptions().setSyncIntervalMs(-1);
-      status = masterClient.getStatus(path, opts);
+      GetStatusPOptions gsOptions = FileSystemClientOptions.getGetStatusOptions();
+      gsOptions = gsOptions.toBuilder()
+          .setLoadMetadataType(LoadMetadataPType.NEVER)
+          .setCommonOptions(
+              FileSystemClientOptions.getCommonOptions().toBuilder()
+                  .setSyncIntervalMs(-1))
+          .build();
+      status = masterClient.getStatus(path, gsOptions);
       LOG.debug("Created file {}, options: {}", path.getPath(), options);
     } catch (AlreadyExistsException e) {
       throw new FileAlreadyExistsException(e.getMessage());
@@ -244,11 +249,11 @@ public class BaseFileSystem implements FileSystem {
   @Override
   public URIStatus getStatus(AlluxioURI path)
       throws FileDoesNotExistException, IOException, AlluxioException {
-    return getStatus(path, GetStatusOptions.defaults());
+    return getStatus(path, FileSystemClientOptions.getGetStatusOptions());
   }
 
   @Override
-  public URIStatus getStatus(AlluxioURI path, GetStatusOptions options)
+  public URIStatus getStatus(AlluxioURI path, GetStatusPOptions options)
       throws FileDoesNotExistException, IOException, AlluxioException {
     checkUri(path);
     FileSystemMasterClient masterClient = mFileSystemContext.acquireMasterClient();

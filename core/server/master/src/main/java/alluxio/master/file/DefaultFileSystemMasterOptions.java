@@ -12,6 +12,7 @@
 package alluxio.master.file;
 
 import alluxio.grpc.GetStatusPOptions;
+import alluxio.grpc.LoadMetadataPType;
 import alluxio.master.file.options.CheckConsistencyOptions;
 import alluxio.master.file.options.CommonOptions;
 import alluxio.master.file.options.CompleteFileOptions;
@@ -68,8 +69,10 @@ public final class DefaultFileSystemMasterOptions implements FileSystemMasterOpt
   }
 
   @Override
-  public GetStatusPOptions.Builder getGetStatusPOptions() {
-    return GetStatusPOptions.newBuilder();
+  public GetStatusPOptions getGetStatusPOptions() {
+    return GetStatusPOptions.newBuilder()
+        .setLoadMetadataType(LoadMetadataPType.ONCE)
+        .build();
   }
 
   @Override

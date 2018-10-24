@@ -17,11 +17,11 @@ import alluxio.AlluxioURI;
 import alluxio.PropertyKey;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.URIStatus;
+import alluxio.client.fs.FileSystemClientOptions;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.status.PermissionDeniedException;
 import alluxio.master.MasterRegistry;
 import alluxio.master.file.FileSystemMaster;
-import alluxio.master.file.options.GetStatusOptions;
 import alluxio.security.LoginUserTestUtils;
 import alluxio.security.authentication.AuthType;
 import alluxio.security.authentication.AuthenticatedClientUser;
@@ -86,8 +86,8 @@ public final class ClusterInitializationIntegrationTest extends BaseIntegrationT
 
     AuthenticatedClientUser.set(SUPER_USER);
     assertEquals(SUPER_USER,
-        fileSystemMaster.getFileInfo(new AlluxioURI("/testFile"), GetStatusOptions.defaults())
-            .getOwner());
+        fileSystemMaster.getFileInfo(new AlluxioURI("/testFile"),
+            FileSystemClientOptions.getGetStatusOptions()).getOwner());
     registry.stop();
   }
 

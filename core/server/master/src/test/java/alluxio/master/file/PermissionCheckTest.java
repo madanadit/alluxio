@@ -26,6 +26,7 @@ import alluxio.ConfigurationTestUtils;
 import alluxio.Constants;
 import alluxio.LoginUserRule;
 import alluxio.PropertyKey;
+import alluxio.client.fs.FileSystemClientOptions;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileDoesNotExistException;
@@ -49,7 +50,6 @@ import alluxio.master.file.options.CreateDirectoryOptions;
 import alluxio.master.file.options.CreateFileOptions;
 import alluxio.master.file.options.DeleteOptions;
 import alluxio.master.file.options.FreeOptions;
-import alluxio.master.file.options.GetStatusOptions;
 import alluxio.master.file.options.ListStatusOptions;
 import alluxio.master.file.options.RenameOptions;
 import alluxio.master.file.options.SetAttributeOptions;
@@ -672,7 +672,8 @@ public final class PermissionCheckTest {
     try (Closeable r = new AuthenticatedUserRule(user.getUser()).toResource()) {
       if (isFile) {
         assertEquals(path,
-            mFileSystemMaster.getFileInfo(new AlluxioURI(path), GetStatusOptions.defaults())
+            mFileSystemMaster.getFileInfo(new AlluxioURI(path),
+                FileSystemClientOptions.getGetStatusOptions())
                 .getPath());
         assertEquals(1,
             mFileSystemMaster.listStatus(new AlluxioURI(path), ListStatusOptions.defaults())
@@ -733,7 +734,8 @@ public final class PermissionCheckTest {
       mFileSystemMaster.setAttribute(new AlluxioURI(path), options);
 
       FileInfo fileInfo =
-          mFileSystemMaster.getFileInfo(new AlluxioURI(path), GetStatusOptions.defaults());
+          mFileSystemMaster.getFileInfo(new AlluxioURI(path),
+              FileSystemClientOptions.getGetStatusOptions());
       return SetAttributeOptions.defaults().setPinned(fileInfo.isPinned()).setTtl(fileInfo.getTtl())
           .setPersisted(fileInfo.isPersisted());
     }

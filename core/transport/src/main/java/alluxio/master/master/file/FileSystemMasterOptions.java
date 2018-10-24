@@ -69,7 +69,7 @@ public interface FileSystemMasterOptions {
   /**
    * @return an instance of {@link GetStatusPOptions}
    */
-  GetStatusPOptions.Builder getGetStatusPOptions();
+  GetStatusPOptions getGetStatusPOptions();
 
   /**
    * @return an instance of {@link ListStatusOptions}
