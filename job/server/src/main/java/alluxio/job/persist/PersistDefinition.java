@@ -176,6 +176,7 @@ public final class PersistDefinition
                     .getSecond().toString());
           }
         }
+        // AM: if ufs supports commit do not close
         OutputStream out = closer.register(
             ufs.create(dstPath.toString(),
                 CreateOptions.defaults(ServerConfiguration.global()).setOwner(uriStatus.getOwner())

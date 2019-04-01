@@ -3921,11 +3921,12 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
       }
 
       MountTable.Resolution resolution = mMountTable.resolve(uri);
-      try (CloseableResource<UnderFileSystem> ufsResource = resolution.acquireUfsResource()) {
+      try (CloseableResource<UnderFileSystem> ufsResource = resolution.acquireUfsResource()) { //AM:
         // If previous persist job failed, clean up the temporary file.
         cleanup(ufsResource.get(), tempUfsPath);
       }
 
+      // AM:
       // Generate a temporary path to be used by the persist job.
       tempUfsPath =
           PathUtils.temporaryFileName(System.currentTimeMillis(), resolution.getUri().toString());
@@ -4058,7 +4059,7 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
      */
     private void handleSuccess(PersistJob job) {
       long fileId = job.getFileId();
-      String tempUfsPath = job.getTempUfsPath();
+      String tempUfsPath = job.getTempUfsPath(); //AM:
       List<Long> blockIds = new ArrayList<>();
       UfsManager.UfsClient ufsClient = null;
       try (JournalContext journalContext = createJournalContext();
@@ -4091,7 +4092,7 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
             mInodeTree.updateInodeFile(journalContext, UpdateInodeFileEntry.newBuilder()
                 .setId(inode.getId())
                 .setPersistJobId(Constants.PERSISTENCE_INVALID_JOB_ID)
-                .setTempUfsPath(Constants.PERSISTENCE_INVALID_UFS_PATH)
+                .setTempUfsPath(Constants.PERSISTENCE_INVALID_UFS_PATH) //AM:
                 .build());
             mInodeTree.updateInode(journalContext, UpdateInodeEntry.newBuilder()
                 .setId(inode.getId())
