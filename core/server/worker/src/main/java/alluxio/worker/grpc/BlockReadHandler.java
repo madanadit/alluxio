@@ -82,21 +82,29 @@ public final class BlockReadHandler extends AbstractReadHandler<BlockReadRequest
 
     @Override
     protected void completeRequest(BlockReadRequestContext context) throws Exception {
+      LOG.info("AM: completing request...");
       BlockReader reader = context.getBlockReader();
+      LOG.info("AM: completing request...got reader");
       if (reader != null) {
         try {
+          LOG.info("AM: completing request...got reader not null");
           reader.close();
         } catch (Exception e) {
           LOG.warn("Failed to close block reader for block {} with error {}.",
               context.getRequest().getId(), e.getMessage());
         }
       }
+      LOG.info("AM: completing request...unlocking block");
       if (!mWorker.unlockBlock(context.getRequest().getSessionId(), context.getRequest().getId())) {
+        LOG.info("AM: completing request...failed to unlock block");
         if (reader != null) {
+          LOG.info("AM: completing request...failed to unlock block...reader not null");
           mWorker.closeUfsBlock(context.getRequest().getSessionId(), context.getRequest().getId());
+          LOG.info("AM: completing request...failed to unlock block...closed ufs block");
           context.setBlockReader(null);
         }
       }
+      LOG.info("AM: completed request...");
     }
 
     @Override

@@ -186,14 +186,18 @@ public final class UnderFileSystemBlockReader implements BlockReader {
             (int) (mInStreamPos - mBlockWriter.getPosition()));
         mBlockWriter.append(buffer.duplicate());
       } catch (Exception e) {
-        LOG.warn("Failed to cache data read from UFS (on read()): {}", e.getMessage());
+        LOG.warn("AM: Failed to cache data read from UFS (on read()): {}", e.getMessage());
         try {
+          LOG.info("Cancelling block writer");
           cancelBlockWriter();
         } catch (IOException ee) {
           LOG.error("Failed to cancel block writer:", ee);
         }
+        throw new IOException(e);
       }
     }
+    LOG.info("Cancelled block writer");
+    LOG.info("Data length is {}, bytes read is {}", data.length, bytesRead);
     return ByteBuffer.wrap(data, 0, bytesRead);
   }
 
@@ -236,10 +240,18 @@ public final class UnderFileSystemBlockReader implements BlockReader {
           mBlockWriter.append(bufCopy);
         }
       } catch (Exception e) {
-        LOG.warn("Failed to cache data read from UFS (on transferTo()): {}", e.getMessage());
-        cancelBlockWriter();
+        LOG.warn("AM: Failed to cache data read from UFS (on transferTo()): {}", e.getMessage());
+        try {
+          LOG.info("AM: Cancelling block writer");
+          cancelBlockWriter();
+        } catch (IOException ee) {
+          LOG.error("Failed to cancel block writer:", ee);
+        }
+        throw new IOException(e);
       }
     }
+    LOG.info("AM: Cancelled block writer");
+    LOG.info("AM: Bytes read is {}", bytesRead);
 
     return bytesRead;
   }

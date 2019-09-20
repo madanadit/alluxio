@@ -302,6 +302,7 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
       boolean cancel;
       Error error;  // error occurred, abort requested.
       while (true) {
+        LOG.info("AM: while reader");
         final long start;
         final int chunkSize;
         try (LockResource lr = new LockResource(mLock)) {
@@ -332,6 +333,7 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
               .getEnd()) {
             // This can happen if the requested read length is greater than the actual length of the
             // block or file starting from the given offset.
+            LOG.info("AM: setting EOF");
             setEof();
           }
 
@@ -366,14 +368,17 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
               "Exception occurred while reading data for read request {}.", mContext.getRequest(),
               e);
           setError(new Error(AlluxioStatusException.fromThrowable(e), true));
+          LOG.info("AM: Set error is a success");
           continue;
         }
       }
 
       if (error != null) {
+        LOG.info("AM: handling error");
         try {
           // mRequest is null if an exception is thrown when initializing mRequest.
           if (mRequest != null) {
+            LOG.info("AM: Completing request");
             completeRequest(mContext);
           }
         } catch (Exception e) {
@@ -382,17 +387,20 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
         replyError(error);
       } else if (eof || cancel) {
         try {
+          LOG.info("AM: Completing cancelled request");
           completeRequest(mContext);
         } catch (Exception e) {
           LogUtils.warnWithException(LOG, "Exception occurred while completing read request {}.",
               mContext.getRequest(), e);
           setError(new Error(AlluxioStatusException.fromThrowable(e), true));
         }
+        LOG.info("AM: replying");
         if (eof) {
           replyEof();
         } else {
           replyCancel();
         }
+        LOG.info("AM: replied");
       }
     }
 
@@ -422,10 +430,14 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
     private void replyError(Error error) {
       mSerializingExecutor.execute(() -> {
         try {
+          LOG.info("AM: replying error {}", error);
           mResponse.onError(error.getCause().toGrpcStatusException());
+          LOG.info("AM: replied error");
         } catch (StatusRuntimeException e) {
+          LOG.info("AM: caught exception in reply", e);
           // Ignores the error when client already closed the stream.
           if (e.getStatus().getCode() != Status.Code.CANCELLED) {
+            LOG.info("AM: throwing exception", e);
             throw e;
           }
         }
