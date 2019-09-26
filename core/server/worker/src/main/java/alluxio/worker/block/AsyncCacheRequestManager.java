@@ -91,6 +91,7 @@ public class AsyncCacheRequestManager {
       mAsyncCacheExecutor.submit(() -> {
         boolean result = false;
         try {
+          LOG.info("Acquiring lock");
           // Check if the block has already been cached on this worker
           long lockId = mBlockWorker.lockBlockNoException(Sessions.ASYNC_CACHE_SESSION_ID, blockId);
           if (lockId != BlockLockManager.INVALID_LOCK_ID) {
@@ -102,13 +103,17 @@ public class AsyncCacheRequestManager {
             ASYNC_CACHE_DUPLICATE_REQUESTS.inc();
             return;
           }
+          LOG.info("Opening ufs block");
           Protocol.OpenUfsBlockOptions openUfsBlockOptions = request.getOpenUfsBlockOptions();
           boolean isSourceLocal = mLocalWorkerHostname.equals(request.getSourceHost());
           // Depends on the request, cache the target block from different sources
           if (isSourceLocal) {
+            LOG.info("Source is local");
             ASYNC_CACHE_UFS_BLOCKS.inc();
             result = cacheBlockFromUfs(blockId, blockLength, openUfsBlockOptions);
+            LOG.info("Done caching block from ufs");
           } else {
+            LOG.info("Source is remote");
             ASYNC_CACHE_REMOTE_BLOCKS.inc();
             InetSocketAddress sourceAddress =
                 new InetSocketAddress(request.getSourceHost(), request.getSourcePort());
@@ -149,6 +154,7 @@ public class AsyncCacheRequestManager {
       Protocol.OpenUfsBlockOptions openUfsBlockOptions) {
     // Check if the block has been requested in UFS block store
     try {
+      LOG.info("Opening ufs block");
       if (!mBlockWorker
           .openUfsBlock(Sessions.ASYNC_CACHE_SESSION_ID, blockId, openUfsBlockOptions)) {
         LOG.warn("Failed to async cache block {} from UFS on opening the block", blockId);
@@ -158,24 +164,30 @@ public class AsyncCacheRequestManager {
       // It is already cached
       return true;
     }
+    LOG.info("Reading ufs block");
     try (BlockReader reader = mBlockWorker
         .readUfsBlock(Sessions.ASYNC_CACHE_SESSION_ID, blockId, 0)) {
+      LOG.info("Opened reader ufs block");
       // Read the entire block, caching to block store will be handled internally in UFS block store
       // Note that, we read from UFS with a smaller buffer to avoid high pressure on heap
       // memory when concurrent async requests are received and thus trigger GC.
       long offset = 0;
       while (offset < blockSize) {
+        LOG.info("reading...");
         long bufferSize = Math.min(8 * Constants.MB, blockSize - offset);
         reader.read(offset, bufferSize);
         offset += bufferSize;
       }
+      LOG.info("Done reading");
     } catch (AlluxioException | IOException e) {
       // This is only best effort
       LOG.warn("Failed to async cache block {} from UFS on copying the block: {}", blockId, e);
       return false;
     } finally {
       try {
+        LOG.info("close ufs block");
         mBlockWorker.closeUfsBlock(Sessions.ASYNC_CACHE_SESSION_ID, blockId);
+        LOG.info("closed ufs block");
       } catch (AlluxioException | IOException ee) {
         LOG.warn("Failed to close UFS block {}: {}", blockId, ee);
         return false;

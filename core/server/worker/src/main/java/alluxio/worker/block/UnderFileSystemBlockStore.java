@@ -230,6 +230,7 @@ public final class UnderFileSystemBlockStore implements SessionCleanable {
    */
   public BlockReader getBlockReader(final long sessionId, long blockId, long offset)
       throws BlockDoesNotExistException, IOException {
+    LOG.info("Get block reader");
     final BlockInfo blockInfo;
     try (LockResource lr = new LockResource(mLock)) {
       blockInfo = getBlockInfo(sessionId, blockId);
@@ -242,6 +243,7 @@ public final class UnderFileSystemBlockStore implements SessionCleanable {
         UnderFileSystemBlockReader.create(blockInfo.getMeta(), offset, mLocalBlockStore,
             mUfsManager, mUfsInstreamManager);
     blockInfo.setBlockReader(reader);
+    LOG.info("Got block reader");
     return reader;
   }
 

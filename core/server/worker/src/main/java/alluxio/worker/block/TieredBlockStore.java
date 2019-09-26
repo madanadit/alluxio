@@ -289,7 +289,7 @@ public class TieredBlockStore implements BlockStore {
   @Override
   public void requestSpace(long sessionId, long blockId, long additionalBytes)
       throws BlockDoesNotExistException, WorkerOutOfSpaceException, IOException {
-    LOG.debug("requestSpace: sessionId={}, blockId={}, additionalBytes={}", sessionId, blockId,
+    LOG.info("requestSpace: sessionId={}, blockId={}, additionalBytes={}", sessionId, blockId,
         additionalBytes);
     RetryPolicy retryPolicy = new TimeoutRetry(FREE_SPACE_TIMEOUT_MS, EVICTION_INTERVAL_MS);
     while (retryPolicy.attempt()) {
@@ -376,14 +376,14 @@ public class TieredBlockStore implements BlockStore {
   @Override
   public void freeSpace(long sessionId, long availableBytes, BlockStoreLocation location)
       throws BlockDoesNotExistException, WorkerOutOfSpaceException, IOException {
-    LOG.debug("freeSpace: sessionId={}, availableBytes={}, location={}",
+    LOG.info("freeSpace: sessionId={}, availableBytes={}, location={}",
         sessionId, availableBytes, location);
     freeSpaceInternal(sessionId, availableBytes, location, Mode.BEST_EFFORT);
   }
 
   @Override
   public void cleanupSession(long sessionId) {
-    LOG.debug("cleanupSession: sessionId={}", sessionId);
+    LOG.info("cleanupSession: sessionId={}", sessionId);
     // Release all locks the session is holding.
     mLockManager.cleanupSession(sessionId);
 
@@ -625,7 +625,13 @@ public class TieredBlockStore implements BlockStore {
     // block lock here since no sharing
     try (LockResource r = new LockResource(mMetadataWriteLock)) {
       TempBlockMeta tempBlockMeta = mMetaManager.getTempBlockMeta(blockId);
+      LOG.info("block_location={}, available_bytes={}, additional_bytes={}",
+          tempBlockMeta.getBlockLocation(), tempBlockMeta.getParentDir().getAvailableBytes(),
+          additionalBytes);
       if (tempBlockMeta.getParentDir().getAvailableBytes() < additionalBytes) {
+        LOG.info("returning block_location={}, available_bytes={}, additional_bytes={}",
+            tempBlockMeta.getBlockLocation(), tempBlockMeta.getParentDir().getAvailableBytes(),
+            additionalBytes);
         return new Pair<>(false, tempBlockMeta.getBlockLocation());
       }
       // Increase the size of this temp block
@@ -635,6 +641,7 @@ public class TieredBlockStore implements BlockStore {
       } catch (InvalidWorkerStateException e) {
         throw Throwables.propagate(e); // we shall never reach here
       }
+      LOG.info("found space for blockid={}, path={}", blockId, tempBlockMeta.getPath());
       return new Pair<>(true, null);
     }
   }
@@ -653,17 +660,21 @@ public class TieredBlockStore implements BlockStore {
       Evictor.Mode mode) throws WorkerOutOfSpaceException, IOException {
     EvictionPlan plan;
     // NOTE:change the read lock to the write lock due to the endless-loop issue [ALLUXIO-3089]
+    LOG.info("acquiring metadata write lock. availableBytes={}", availableBytes);
     try (LockResource r = new LockResource(mMetadataWriteLock)) {
       plan = mEvictor.freeSpaceWithView(availableBytes, location, getUpdatedView(), mode);
+      LOG.info("freeSpace returned. availableBytes={}", availableBytes);
       // Absent plan means failed to evict enough space.
       if (plan == null) {
         throw new WorkerOutOfSpaceException(
             ExceptionMessage.NO_EVICTION_PLAN_TO_FREE_SPACE, availableBytes, location.tierAlias());
       }
+      LOG.info("freeSpace is not null. availableBytes={}", availableBytes);
     }
 
     // 1. remove blocks to make room.
     for (Pair<Long, BlockStoreLocation> blockInfo : plan.toEvict()) {
+      LOG.info("freeSpace is evicting block {} from path {}", blockInfo.getFirst(), blockInfo.getSecond().dir());
       try {
         removeBlockInternal(Sessions.createInternalSessionId(),
             blockInfo.getFirst(), blockInfo.getSecond());
@@ -675,6 +686,7 @@ public class TieredBlockStore implements BlockStore {
         LOG.info("Failed to evict blockId {}, it could be already deleted", blockInfo.getFirst());
         continue;
       }
+      LOG.info("freeSpace evicted block {} from path {}", blockInfo.getFirst(), blockInfo.getSecond().dir());
       synchronized (mBlockStoreEventListeners) {
         for (BlockStoreEventListener listener : mBlockStoreEventListeners) {
           listener.onRemoveBlockByWorker(sessionId, blockInfo.getFirst());

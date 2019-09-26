@@ -11,8 +11,12 @@
 
 package alluxio.network.protocol.databuffer;
 
+import alluxio.conf.PropertyKey;
+
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -22,6 +26,7 @@ import java.nio.ByteBuffer;
  * A DataBuffer with the underlying data being a {@link ByteBuf}.
  */
 public final class NettyDataBuffer implements DataBuffer {
+  private static final Logger LOG = LoggerFactory.getLogger(NettyDataBuffer.class);
   private final ByteBuf mNettyBuf;
 
   /**
@@ -39,38 +44,47 @@ public final class NettyDataBuffer implements DataBuffer {
    */
   @Override
   public Object getNettyOutput() {
+    LOG.info("Get netty output");
     return mNettyBuf;
   }
 
   @Override
   public long getLength() {
+    LOG.info("Get length {}", mNettyBuf.readableBytes());
     return mNettyBuf.readableBytes();
   }
 
   @Override
   public ByteBuffer getReadOnlyByteBuffer() {
+    LOG.info("Get readonly byte buffer");
     ByteBuffer buffer = mNettyBuf.nioBuffer().asReadOnlyBuffer();
+    LOG.info("set readonly byte buffer position");
     buffer.position(0);
+    LOG.info("set readonly byte buffer position to zero");
     return buffer;
   }
 
   @Override
   public void readBytes(byte[] dst, int dstIndex, int length) {
+    LOG.info("Get read bytes");
     mNettyBuf.readBytes(dst, dstIndex, length);
   }
 
   @Override
   public void readBytes(OutputStream outputStream, int length) throws IOException {
+    LOG.info("Get read bytes 2");
     mNettyBuf.readBytes(outputStream, length);
   }
 
   @Override
   public void readBytes(ByteBuffer outputBuf) {
+    LOG.info("Get read bytes 3");
     mNettyBuf.readBytes(outputBuf);
   }
 
   @Override
   public int readableBytes() {
+    LOG.info("Get read bytes 4");
     return mNettyBuf.readableBytes();
   }
 
@@ -79,6 +93,8 @@ public final class NettyDataBuffer implements DataBuffer {
    */
   @Override
   public void release() {
+    LOG.info("release buffer");
     mNettyBuf.release();
+    LOG.info("released buffer");
   }
 }

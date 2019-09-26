@@ -113,6 +113,7 @@ public final class LocalFileBlockWriter implements BlockWriter {
    * @return the size of data that was written
    */
   private long write(long offset, ByteBuffer inputBuf) throws IOException {
+    LOG.info("Writing at offset={} to path={}", offset, mFilePath);
     int inputBufLength = inputBuf.limit() - inputBuf.position();
     MappedByteBuffer outputBuf =
         mLocalFileChannel.map(FileChannel.MapMode.READ_WRITE, offset, inputBufLength);

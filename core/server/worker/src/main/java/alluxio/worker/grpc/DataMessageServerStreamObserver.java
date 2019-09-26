@@ -17,6 +17,8 @@ import alluxio.network.protocol.databuffer.DataBuffer;
 
 import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -27,7 +29,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  */
 @NotThreadSafe
 public class DataMessageServerStreamObserver<T> extends CallStreamObserver<T> {
-
+  private static final Logger LOG = LoggerFactory.getLogger(DataMessageServerStreamObserver.class);
   private final BufferRepository<T, DataBuffer> mBufferRepository;
   private final CallStreamObserver<T> mObserver;
 
@@ -61,6 +63,7 @@ public class DataMessageServerStreamObserver<T> extends CallStreamObserver<T> {
 
   @Override
   public void onError(Throwable t) {
+    LOG.info("Forwarding error to observer", t);
     mObserver.onError(t);
   }
 

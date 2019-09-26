@@ -109,8 +109,10 @@ public final class BlockReadHandler extends AbstractReadHandler<BlockReadRequest
       try {
         while (buf.writableBytes() > 0 && blockReader.transferTo(buf) != -1) {
         }
+        LOG.info("Creating netty data buffer capacity {}, writeable bytes {}", len, buf.writableBytes());
         return new NettyDataBuffer(buf);
       } catch (Throwable e) {
+        LOG.info("Releasing buffer");
         buf.release();
         throw e;
       }

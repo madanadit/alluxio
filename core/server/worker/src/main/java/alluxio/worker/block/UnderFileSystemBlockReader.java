@@ -147,9 +147,12 @@ public final class UnderFileSystemBlockReader implements BlockReader {
 
   @Override
   public ByteBuffer read(long offset, long length) throws IOException {
+    LOG.info("reading...");
     Preconditions.checkState(!mClosed);
     updateUnderFileSystemInputStream(offset);
+    LOG.info("updating block writer...");
     updateBlockWriter(offset);
+    LOG.info("updated block writer...");
 
     long bytesToRead = Math.min(length, mBlockMeta.getBlockSize() - offset);
     if (bytesToRead <= 0) {
@@ -171,6 +174,7 @@ public final class UnderFileSystemBlockReader implements BlockReader {
       bytesRead += read;
     }
     mInStreamPos += bytesRead;
+    LOG.info("read from ufs");
 
     // We should always read the number of bytes as expected since the UFS file length (hence block
     // size) should be always accurate.
@@ -180,11 +184,17 @@ public final class UnderFileSystemBlockReader implements BlockReader {
     if (mBlockWriter != null && mBlockWriter.getPosition() < mInStreamPos) {
       try {
         Preconditions.checkState(mBlockWriter.getPosition() >= offset);
-        mLocalBlockStore.requestSpace(mBlockMeta.getSessionId(), mBlockMeta.getBlockId(),
-            mInStreamPos - mBlockWriter.getPosition());
-        ByteBuffer buffer = ByteBuffer.wrap(data, (int) (mBlockWriter.getPosition() - offset),
-            (int) (mInStreamPos - mBlockWriter.getPosition()));
-        mBlockWriter.append(buffer.duplicate());
+        long reserve = mInStreamPos - mBlockWriter.getPosition();
+        LOG.info("requesting space for blockId={}, additional_bytes={}", mBlockMeta.getBlockId(), reserve);
+        mLocalBlockStore.requestSpace(mBlockMeta.getSessionId(), mBlockMeta.getBlockId(), reserve);
+        long offsetB = mBlockWriter.getPosition() - offset;
+        ByteBuffer buffer = ByteBuffer.wrap(data, (int) (offsetB),
+            (int) (reserve));
+        LOG.info("duplicating buffer");
+        ByteBuffer dupBuffer = buffer.duplicate();
+        LOG.info("appending to block writer with buffer. offset={}, position={}", offsetB, mBlockWriter.getPosition());
+        mBlockWriter.append(dupBuffer);
+        LOG.info("appended to block writer with buffer. offset={}", offsetB);
       } catch (Exception e) {
         LOG.warn("Failed to cache data read from UFS (on read()): {}", e.getMessage());
         try {
@@ -194,6 +204,7 @@ public final class UnderFileSystemBlockReader implements BlockReader {
         }
       }
     }
+    LOG.info("Wrapping bytesRead {}", bytesRead);
     return ByteBuffer.wrap(data, 0, bytesRead);
   }
 
@@ -238,6 +249,7 @@ public final class UnderFileSystemBlockReader implements BlockReader {
       } catch (Exception e) {
         LOG.warn("Failed to cache data read from UFS (on transferTo()): {}", e.getMessage());
         cancelBlockWriter();
+        LOG.info("Cancelled block writer. Bytes read are {}", bytesRead);
       }
     }
 

@@ -155,6 +155,8 @@ function main {
 
   writeConf
 
+  ulimit -c unlimited
+
   local processes
   processes=()
   case "${service}" in

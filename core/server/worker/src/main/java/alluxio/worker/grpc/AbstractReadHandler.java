@@ -330,25 +330,34 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
           }
           if (chunk == null || chunk.getLength() < chunkSize || start + chunkSize == mRequest
               .getEnd()) {
+            LOG.info("Setting EOF");
             // This can happen if the requested read length is greater than the actual length of the
             // block or file starting from the given offset.
             setEof();
+            LOG.info("Set EOF");
           }
 
           if (chunk != null) {
             DataBuffer finalChunk = chunk;
+            LOG.info("Submitting final chunk to executor");
             mSerializingExecutor.execute(() -> {
               try {
+                LOG.info("Building chunk response");
                 ReadResponse response = ReadResponse.newBuilder().setChunk(Chunk.newBuilder()
                     .setData(UnsafeByteOperations.unsafeWrap(finalChunk.getReadOnlyByteBuffer()))
                 ).build();
+                LOG.info("Built chunk response");
                 if (mResponse instanceof DataMessageServerStreamObserver) {
+                  LOG.info("Response is 1");
                   ((DataMessageServerStreamObserver<ReadResponse>) mResponse)
                       .onNext(new DataMessage<>(response, finalChunk));
                 } else {
+                  LOG.info("Response is 2");
                   mResponse.onNext(response);
                 }
+                LOG.info("Incrementing metrics");
                 incrementMetrics(finalChunk.getLength());
+                LOG.info("Incremented metrics {}", finalChunk.getLength());
               } catch (Exception e) {
                 LogUtils.warnWithException(LOG,
                     "Exception occurred while sending data for read request {}.",
@@ -356,7 +365,9 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
                 setError(new Error(AlluxioStatusException.fromThrowable(e), true));
               } finally {
                 if (finalChunk != null) {
+                  LOG.info("Releasing final chunk");
                   finalChunk.release();
+                  LOG.info("Released final chunk");
                 }
               }
             });
@@ -371,6 +382,7 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
       }
 
       if (error != null) {
+        LOG.info("Error reading data buffer {}", error);
         try {
           // mRequest is null if an exception is thrown when initializing mRequest.
           if (mRequest != null) {
@@ -381,17 +393,23 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
         }
         replyError(error);
       } else if (eof || cancel) {
+        LOG.info("Completing read request");
         try {
           completeRequest(mContext);
+          LOG.info("Completed read request");
         } catch (Exception e) {
           LogUtils.warnWithException(LOG, "Exception occurred while completing read request {}.",
               mContext.getRequest(), e);
           setError(new Error(AlluxioStatusException.fromThrowable(e), true));
         }
         if (eof) {
+          LOG.info("Replying eof");
           replyEof();
+          LOG.info("Replied eof");
         } else {
+          LOG.info("Replying cancel");
           replyCancel();
+          LOG.info("Replied cancel");
         }
       }
     }
@@ -422,8 +440,10 @@ abstract class AbstractReadHandler<T extends ReadRequestContext<?>>
     private void replyError(Error error) {
       mSerializingExecutor.execute(() -> {
         try {
+          LOG.info("Replying error {}", error);
           mResponse.onError(error.getCause().toGrpcStatusException());
         } catch (StatusRuntimeException e) {
+          LOG.info("Exception when replying error {}", error, e);
           // Ignores the error when client already closed the stream.
           if (e.getStatus().getCode() != Status.Code.CANCELLED) {
             throw e;
