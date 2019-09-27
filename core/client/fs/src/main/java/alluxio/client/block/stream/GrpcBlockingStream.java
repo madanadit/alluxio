@@ -173,7 +173,7 @@ public class GrpcBlockingStream<ReqT, ResT> {
    */
   public void close() {
     if (isOpen()) {
-      LOG.debug("Closing stream ({})", mDescription);
+      LOG.info("Closing stream ({})", mDescription);
       mClosed = true;
       mRequestObserver.onCompleted();
     }
@@ -184,7 +184,7 @@ public class GrpcBlockingStream<ReqT, ResT> {
    */
   public void cancel() {
     if (isOpen()) {
-      LOG.debug("Cancelling stream ({})", mDescription);
+      LOG.info("Cancelling stream ({})", mDescription);
       mCanceled = true;
       mRequestObserver.cancel("Request is cancelled by user.", null);
     }

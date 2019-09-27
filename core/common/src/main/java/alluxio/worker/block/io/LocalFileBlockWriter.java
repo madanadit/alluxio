@@ -96,6 +96,7 @@ public final class LocalFileBlockWriter implements BlockWriter {
 
   @Override
   public void close() throws IOException {
+    LOG.info("Closing local file block writer at path {}", mFilePath);
     if (mClosed) {
       return;
     }
@@ -124,6 +125,7 @@ public final class LocalFileBlockWriter implements BlockWriter {
   }
 
   private long write(long offset, DataBuffer inputBuf) throws IOException {
+    LOG.info("Writing at offset={} to path={} w/ databuffer", offset, mFilePath);
     int inputBufLength = inputBuf.readableBytes();
     MappedByteBuffer outputBuf =
         mLocalFileChannel.map(FileChannel.MapMode.READ_WRITE, offset, inputBufLength);

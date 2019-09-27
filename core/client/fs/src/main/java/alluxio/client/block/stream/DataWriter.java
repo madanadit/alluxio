@@ -67,7 +67,7 @@ public interface DataWriter extends Closeable, Cancelable {
           return UfsFallbackLocalFileDataWriter.create(
               context, address, blockId, blockSize, options);
         }
-        LOG.debug("Creating short circuit output stream for block {} @ {}", blockId, address);
+        LOG.info("Creating short circuit output stream for block {} @ {}", blockId, address);
         return LocalFileDataWriter.create(context, address, blockId, options);
       } else {
         LOG.debug("Creating gRPC output stream for block {} @ {} from client {}", blockId, address,

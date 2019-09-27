@@ -45,6 +45,7 @@ public final class LocalFileDataWriter implements DataWriter {
   private final long mDataTimeoutMs;
   private final BlockWorkerClient mBlockWorker;
   private final LocalFileBlockWriter mWriter;
+  private final String mWriterPath;
   private final long mChunkSize;
   private final CreateLocalBlockRequest mCreateRequest;
   private final Closer mCloser;
@@ -99,10 +100,11 @@ public final class LocalFileDataWriter implements DataWriter {
       stream.send(createRequest, dataTimeout);
       CreateLocalBlockResponse response = stream.receive(dataTimeout);
       Preconditions.checkState(response != null && response.hasPath());
+      LOG.info("Creating local file block writer blockId={} path={}", blockId, response.getPath());
       LocalFileBlockWriter writer =
           closer.register(new LocalFileBlockWriter(response.getPath()));
       return new LocalFileDataWriter(chunkSize, blockWorker,
-          writer, createRequest, stream, closer, fileBufferBytes,
+          writer, response.getPath(), createRequest, stream, closer, fileBufferBytes,
           dataTimeout);
     } catch (Exception e) {
       throw CommonUtils.closeAndRethrow(closer, e);
@@ -135,14 +137,21 @@ public final class LocalFileDataWriter implements DataWriter {
 
   @Override
   public void cancel() throws IOException {
+    LOG.info("Cancelling local file writer for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
+    boolean closeStream = true;
     if (mStream.isClosed() || mStream.isCanceled()) {
-      return;
+      closeStream = false;
+      LOG.info("Stream is cancelled for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
+//      return;
     }
     try {
-      mStream.cancel();
+      if (closeStream) {
+        mStream.cancel();
+      }
     } catch (Exception e) {
       throw mCloser.rethrow(e);
     } finally {
+      LOG.info("Closer in cancel for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
       mCloser.close();
     }
   }
@@ -152,16 +161,23 @@ public final class LocalFileDataWriter implements DataWriter {
 
   @Override
   public void close() throws IOException {
+    LOG.info("Closing local file writer for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
+    boolean closeStream = true;
     if (mStream.isClosed() || mStream.isCanceled()) {
-      return;
+      closeStream = false;
+      LOG.info("Stream is closed for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
+//      return;
     }
-    mCloser.register(new Closeable() {
-      @Override
-      public void close() throws IOException {
-        mStream.close();
-        mStream.waitForComplete(mDataTimeoutMs);
-      }
-    });
+    if (closeStream) {
+      mCloser.register(new Closeable() {
+        @Override
+        public void close() throws IOException {
+          mStream.close();
+          mStream.waitForComplete(mDataTimeoutMs);
+        }
+      });
+    }
+    LOG.info("Closer in close for blockId={}, writerPath={}", mCreateRequest.getBlockId(), mWriterPath);
     mCloser.close();
   }
 
@@ -176,7 +192,7 @@ public final class LocalFileDataWriter implements DataWriter {
    * @param closer the closer
    */
   private LocalFileDataWriter(long packetSize,
-      BlockWorkerClient blockWorker, LocalFileBlockWriter writer,
+      BlockWorkerClient blockWorker, LocalFileBlockWriter writer, String writerPath,
       CreateLocalBlockRequest createRequest,
       GrpcBlockingStream<CreateLocalBlockRequest, CreateLocalBlockResponse> stream,
       Closer closer, long fileBufferBytes, long dataTimeoutMs) {
@@ -185,6 +201,7 @@ public final class LocalFileDataWriter implements DataWriter {
     mBlockWorker = blockWorker;
     mCloser = closer;
     mWriter = writer;
+    mWriterPath = writerPath;
     mCreateRequest = createRequest;
     mStream = stream;
     mPosReserved += mFileBufferBytes;
@@ -210,6 +227,7 @@ public final class LocalFileDataWriter implements DataWriter {
     Preconditions.checkState(!response.hasPath(),
         String.format("Invalid response for reserve request %s", request.toString()));
     mPosReserved += toReserve;
+    LOG.info("Reserved path={}, blockId={}", response.getPath(), mCreateRequest.getBlockId());
   }
 }
 

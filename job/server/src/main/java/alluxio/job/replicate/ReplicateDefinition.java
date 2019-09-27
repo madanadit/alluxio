@@ -95,6 +95,7 @@ public final class ReplicateDefinition
   @Override
   public SerializableVoid runTask(ReplicateConfig config, SerializableVoid arg,
       RunTaskContext context) throws Exception {
+    LOG.info("Replicating file " + config.getPath() + " block " + config.getBlockId());
     JobUtils.loadBlock(context.getFileSystem(), context.getFsContext(),
         config.getPath(), config.getBlockId());
     LOG.info("Replicated file " + config.getPath() + " block " + config.getBlockId());

@@ -209,6 +209,7 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
 
   @Override
   public void cancel() throws IOException {
+    LOG.info("Cancelling out stream");
     if (mClosed) {
       return;
     }
@@ -216,9 +217,11 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
 
     IOException exception = null;
     for (DataWriter dataWriter : mDataWriters) {
+      LOG.info("Cancelling out stream data writer of type {}", dataWriter.getClass());
       try {
         dataWriter.cancel();
       } catch (IOException e) {
+        LOG.info("Exception cancelling out stream data writer of type {}", dataWriter.getClass(), e);
         if (exception != null) {
           exception.addSuppressed(e);
         }
@@ -233,6 +236,7 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
 
   @Override
   public void close() throws IOException {
+    LOG.info("Closing out stream");
     if (mClosed) {
       return;
     }
@@ -298,6 +302,7 @@ public class BlockOutStream extends OutputStream implements BoundedStream, Cance
    * Releases the current packet.
    */
   private void releaseCurrentChunk() {
+    LOG.info("releasing current chunk");
     if (mCurrentChunk != null) {
       mCurrentChunk.release();
       mCurrentChunk = null;

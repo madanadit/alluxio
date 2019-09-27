@@ -39,6 +39,8 @@ import alluxio.wire.WorkerNetAddress;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,6 +53,7 @@ import java.util.concurrent.ConcurrentMap;
  * Utility class to make it easier to write jobs.
  */
 public final class JobUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(JobUtils.class);
   private static final IndexDefinition<BlockWorkerInfo, WorkerNetAddress> WORKER_ADDRESS_INDEX =
       new IndexDefinition<BlockWorkerInfo, WorkerNetAddress>(true) {
         @Override
@@ -107,6 +110,7 @@ public final class JobUtils {
    */
   public static void loadBlock(FileSystem fs, FileSystemContext context, String path, long blockId)
       throws AlluxioException, IOException {
+    LOG.info("Loading blockId={}, path={}", blockId, path);
     AlluxioBlockStore blockStore = AlluxioBlockStore.create(context);
 
     String localHostName = NetworkAddressUtils.getConnectHost(ServiceType.WORKER_RPC,
@@ -124,6 +128,7 @@ public final class JobUtils {
       throw new NotFoundException(ExceptionMessage.NO_LOCAL_BLOCK_WORKER_REPLICATE_TASK
           .getMessage(blockId));
     }
+    LOG.info("Found local worker {} blockId={}, path={}", localNetAddress.toString(), blockId, path);
 
     // TODO(jiri): Replace with internal client that uses file ID once the internal client is
     // factored out of the core server module. The reason to prefer using file ID for this job is
@@ -153,12 +158,14 @@ public final class JobUtils {
     outOptions.setLocationPolicy(BlockLocationPolicy.Factory.create(
         LocalFirstPolicy.class.getCanonicalName(), conf));
 
+    LOG.info("Copying blockId={}, path={}", blockId, path);
     // use -1 to reuse the existing block size for this block
     try (OutputStream outputStream =
-        blockStore.getOutStream(blockId, -1, localNetAddress, outOptions)) {
+             blockStore.getOutStream(blockId, -1, localNetAddress, outOptions)) {
       try (InputStream inputStream = blockStore.getInStream(blockId, inOptions)) {
         ByteStreams.copy(inputStream, outputStream);
       } catch (Throwable t) {
+        LOG.info("Cancelling outstream. blockId={}, path={} due to error:", blockId, path, t);
         try {
           ((Cancelable) outputStream).cancel();
         } catch (Throwable t2) {

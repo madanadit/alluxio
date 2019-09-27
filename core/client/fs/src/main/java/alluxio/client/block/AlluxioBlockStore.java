@@ -282,7 +282,7 @@ public final class AlluxioBlockStore {
       throw new ResourceExhaustedException(ExceptionMessage.NO_SPACE_FOR_BLOCK_ON_WORKER
           .getMessage(FormatUtils.getSizeFromBytes(blockSize)));
     }
-    LOG.debug("Create block outstream for {} of block size {} at address {}, using options: {}",
+    LOG.info("Create block outstream for {} of block size {} at address {}, using options: {}",
         blockId, blockSize, address, options);
     return BlockOutStream.create(mContext, blockId, blockSize, address, options);
   }
