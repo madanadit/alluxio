@@ -3235,11 +3235,11 @@ public final class DefaultFileSystemMaster extends CoreMaster
     try (RpcContext rpcContext = createRpcContext()) {
       if (changedFiles == null) {
         // full sync
-        LockingScheme lockingScheme = new LockingScheme(path, LockPattern.READ, true);
+        LockingScheme lockingScheme = new LockingScheme(path, LockPattern.READ, false);
         try (LockedInodePath inodePath =
             mInodeTree.lockInodePath(lockingScheme.getPath(), lockingScheme.getPattern())) {
-          syncMetadataInternal(rpcContext, inodePath, lockingScheme, DescendantType.ALL,
-              populateStatusCache(path, DescendantType.ALL));
+          syncMetadataInternalWithLockUpgrade(rpcContext, inodePath, lockingScheme,
+              DescendantType.ALL, populateStatusCache(path, DescendantType.ALL), true);
         }
         LOG.info("Ended an active full sync of {}", path.toString());
         return;
@@ -3356,10 +3356,31 @@ public final class DefaultFileSystemMaster extends CoreMaster
    * @return true if the sync was performed successfully, false otherwise (including errors)
    */
   private boolean syncMetadataInternal(RpcContext rpcContext, LockedInodePath inodePath,
-      LockingScheme lockingScheme, DescendantType syncDescendantType,
-      Map<AlluxioURI, UfsStatus> statusCache)
+                                       LockingScheme lockingScheme, DescendantType syncDescendantType,
+                                       Map<AlluxioURI, UfsStatus> statusCache)
       throws IOException {
-    Preconditions.checkState(inodePath.getLockPattern() == LockPattern.WRITE_EDGE);
+    return syncMetadataInternalWithLockUpgrade(rpcContext, inodePath, lockingScheme,
+        syncDescendantType, statusCache, false);
+  }
+
+  /**
+   * Syncs the Alluxio metadata with UFS.
+   *
+   * @param rpcContext the rpcContext
+   * @param inodePath the Alluxio inode path to sync with UFS
+   * @param lockingScheme the locking scheme used to lock the inode path
+   * @param syncDescendantType how to sync descendants
+   * @param statusCache a cache provided to the sync method which stores the UfsStatus of files
+   * @param lockUpgrade whether inode is READ locked initially and upgraded to WRITE_EDGE if needed
+   * @return true if the sync was performed successfully, false otherwise (including errors)
+   */
+  private boolean syncMetadataInternalWithLockUpgrade(RpcContext rpcContext, LockedInodePath inodePath,
+      LockingScheme lockingScheme, DescendantType syncDescendantType,
+      Map<AlluxioURI, UfsStatus> statusCache, boolean lockUpgrade)
+      throws IOException {
+    if (!lockUpgrade) {
+      Preconditions.checkState(inodePath.getLockPattern() == LockPattern.WRITE_EDGE);
+    }
 
     // The high-level process for the syncing is:
     // 1. Find all Alluxio paths which are not consistent with the corresponding UFS path.
@@ -3379,7 +3400,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
         pathsToLoad.add(inodePath.getUri().getPath());
       } else {
         SyncResult result =
-            syncInodeMetadata(rpcContext, inodePath, syncDescendantType, statusCache);
+            syncInodeMetadata(rpcContext, inodePath, syncDescendantType, statusCache, lockUpgrade);
         if (result.getDeletedInode()) {
           // If the inode was deleted, then the inode path should reflect the delete.
           inodePath.removeLastInode();
@@ -3391,11 +3412,14 @@ public final class DefaultFileSystemMaster extends CoreMaster
           inodePath.getUri(), e);
       return false;
     } finally {
-      inodePath.downgradeToPattern(lockingScheme.getDesiredPattern());
+      if (!lockUpgrade) {
+        inodePath.downgradeToPattern(lockingScheme.getDesiredPattern());
+      }
     }
 
     // Update metadata for all the mount points
     for (String mountPoint : pathsToLoad) {
+      // TODO(adit): upgrade to write lock for paths to load
       if (Thread.currentThread().isInterrupted()) {
         LOG.warn("Thread syncing {} was interrupted before completion", inodePath.getUri());
         return false;
@@ -3489,14 +3513,17 @@ public final class DefaultFileSystemMaster extends CoreMaster
    * @param syncDescendantType how to sync descendants
    * @param statusCache a pre-populated cache of ufs statuses that can be used to construct
    *                    fingerprint
+   * @param lockUpgrade whether inode is READ locked initially and upgraded to WRITE_EDGE if needed
    * @return the result of the sync, including if the inode was deleted, and if further load
    *         metadata is required
    */
   private SyncResult syncInodeMetadata(RpcContext rpcContext, LockedInodePath inodePath,
-      DescendantType syncDescendantType, Map<AlluxioURI, UfsStatus> statusCache)
+      DescendantType syncDescendantType, Map<AlluxioURI, UfsStatus> statusCache,
+      boolean lockUpgrade)
       throws FileDoesNotExistException, InvalidPathException, IOException, AccessControlException {
-    Preconditions.checkState(inodePath.getLockPattern() == LockPattern.WRITE_EDGE);
-
+    if (!lockUpgrade) {
+      Preconditions.checkState(inodePath.getLockPattern() == LockPattern.WRITE_EDGE);
+    }
     if (Thread.currentThread().isInterrupted()) {
       LOG.warn("Thread syncing {} was interrupted before completion", inodePath.getUri());
       return SyncResult.defaults();
@@ -3555,6 +3582,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
       UfsSyncUtils.SyncPlan syncPlan =
           UfsSyncUtils.computeSyncPlan(inode, ufsFpParsed, containsMountPoint);
 
+      // TODO(adit): upgrade to write lock
       if (syncPlan.toUpdateMetaData()) {
         // UpdateMetadata is used when a file or a directory only had metadata change.
         // It works by calling SetAttributeInternal on the inodePath.
@@ -3620,7 +3648,7 @@ public final class DefaultFileSystemMaster extends CoreMaster
               syncDescendantType = DescendantType.NONE;
             }
             SyncResult syncResult =
-                syncInodeMetadata(rpcContext, descendant, syncDescendantType, statusCache);
+                syncInodeMetadata(rpcContext, descendant, syncDescendantType, statusCache, lockUpgrade);
             pathsToLoad.addAll(syncResult.getPathsToLoad());
           }
         }
